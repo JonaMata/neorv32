@@ -34,9 +34,14 @@ end neorv32_cfs;
 architecture neorv32_cfs_rtl of neorv32_cfs is
 
   -- exemplary CFS interface registers --
-  type cfs_regs_t is array (0 to 3) of std_ulogic_vector(31 downto 0); -- implement 4 registers for this example
-  signal cfs_reg_wr : cfs_regs_t; -- for WRITE accesses
-  signal cfs_reg_rd : cfs_regs_t; -- for READ accesses
+  type in_row is array (0 to 12) of std_ulogic_vector(31 downto 0);
+  type in_mat_type is array (0 to 2) of in_row;
+  signal in_mat : in_mat_type := (others => (others => (others => '0')));
+  type ker_row is array (0 to 1) of std_ulogic_vector(31 downto 0);
+  type ker_mat_type is array (0 to 1) of ker_row;
+  signal ker_mat : ker_mat_type := (others => (others => (others => '0')));
+  type out_row is array (0 to 10) of std_ulogic_vector(63 downto 0);
+  signal out_mat : out_row := (others => (others => '0'));
 
 begin
 
@@ -105,12 +110,11 @@ begin
   -- a "bus store access" exception (with a "Device Timeout" qualifier as not ACK is generated in that case).
 
   bus_access: process(rstn_i, clk_i)
+  variable address : integer;
   begin
     if (rstn_i = '0') then
-      cfs_reg_wr(0) <= (others => '0');
-      cfs_reg_wr(1) <= (others => '0');
-      cfs_reg_wr(2) <= (others => '0');
-      cfs_reg_wr(3) <= (others => '0');
+      in_mat <= (others => (others => (others => '0')));
+      ker_mat <= (others => (others => (others => '0')));
       bus_rsp_o     <= rsp_terminate_c;
     elsif rising_edge(clk_i) then -- synchronous interface for read and write accesses
       -- transfer/access acknowledge --
@@ -124,31 +128,23 @@ begin
 
       -- bus access --
       if (bus_req_i.stb = '1') then -- valid access cycle, STB is high for one cycle
-
+        address := to_integer(unsigned(bus_req_i.addr(15 downto 2)));
         -- write access (word-wise) --
         if (bus_req_i.rw = '1') then
-          if (bus_req_i.addr(15 downto 2) = "00000000000000") then -- 16-bit byte address = 14-bit word address
-            cfs_reg_wr(0) <= bus_req_i.data;
-          end if;
-          if (bus_req_i.addr(15 downto 2) = "00000000000001") then
-            cfs_reg_wr(1) <= bus_req_i.data;
-          end if;
-          if (bus_req_i.addr(15 downto 2) = "00000000000010") then
-            cfs_reg_wr(2) <= bus_req_i.data;
-          end if;
-          if (bus_req_i.addr(15 downto 2) = "00000000000011") then
-            cfs_reg_wr(3) <= bus_req_i.data;
+          if (address < 3*13) then
+            in_mat(address / 13)(address mod 13) <= bus_req_i.data;
+          elsif (address < 3*13 + 4) then
+            address := address - 3*13;
+            ker_mat(address / 2)(address mod 2) <= bus_req_i.data;
           end if;
 
         -- read access (word-wise) --
         else
-          case bus_req_i.addr(15 downto 2) is -- 16-bit byte address = 14-bit word address
-            when "00000000000000" => bus_rsp_o.data <= cfs_reg_rd(0);
-            when "00000000000001" => bus_rsp_o.data <= cfs_reg_rd(1);
-            when "00000000000010" => bus_rsp_o.data <= cfs_reg_rd(2);
-            when "00000000000011" => bus_rsp_o.data <= cfs_reg_rd(3);
-            when others           => bus_rsp_o.data <= (others => '0');
-          end case;
+          if (address mod 2 = 0) then
+            bus_rsp_o.data(31 downto 0) <= out_mat(address / 2)(31 downto 0);
+          else
+            bus_rsp_o.data(31 downto 0) <= out_mat(address / 2)(63 downto 32);
+          end if;
         end if;
 
       end if;
@@ -163,10 +159,17 @@ begin
   -- The logic below is just a very simple example that transforms data
   -- from an input register into data in an output register.
 
-  cfs_reg_rd(0) <= x"0000000" & "000" & or_reduce_f(cfs_reg_wr(0)); -- OR all bits
-  cfs_reg_rd(1) <= x"0000000" & "000" & xor_reduce_f(cfs_reg_wr(1)); -- XOR all bits
-  cfs_reg_rd(2) <= bit_rev_f(cfs_reg_wr(2)); -- bit reversal
-  cfs_reg_rd(3) <= (others => '1');
+  -- cfs_reg_rd(0) <= x"0000000" & "000" & or_reduce_f(cfs_reg_wr(0)); -- OR all bits
+  -- cfs_reg_rd(1) <= x"0000000" & "000" & xor_reduce_f(cfs_reg_wr(1)); -- XOR all bits
+  -- cfs_reg_rd(2) <= bit_rev_f(cfs_reg_wr(2)); -- bit reversal
+  -- cfs_reg_rd(3) <= (others => '1');
+  gen_multiply_add: for i in 0 to 10 generate
+    out_mat(i) <= std_ulogic_vector(
+      unsigned(in_mat(0)(i)) * unsigned(ker_mat(0)(0)) +
+      unsigned(in_mat(0)(i+1)) * unsigned(ker_mat(0)(1)) +
+      unsigned(in_mat(1)(i)) * unsigned(ker_mat(1)(0)) +
+      unsigned(in_mat(1)(i+1)) * unsigned(ker_mat(1)(1)));
+  end generate gen_multiply_add;
 
 
 end neorv32_cfs_rtl;

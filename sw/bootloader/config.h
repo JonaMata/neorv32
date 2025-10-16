@@ -57,7 +57,7 @@
 
 // Enable auto-boot (0,1)
 #ifndef AUTO_BOOT_EN
-#define AUTO_BOOT_EN 1
+#define AUTO_BOOT_EN 0
 #endif
 
 // Time until the auto-boot sequence starts (in seconds)

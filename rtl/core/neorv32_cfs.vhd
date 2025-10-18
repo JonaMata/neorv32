@@ -40,7 +40,7 @@ architecture neorv32_cfs_rtl of neorv32_cfs is
   type ker_row is array (0 to 1) of std_ulogic_vector(31 downto 0);
   type ker_mat_type is array (0 to 1) of ker_row;
   signal ker_mat : ker_mat_type := (others => (others => (others => '0')));
-  type out_row is array (0 to 10) of std_ulogic_vector(63 downto 0);
+  type out_row is array (0 to 11) of std_ulogic_vector(63 downto 0);
   signal out_mat : out_row := (others => (others => '0'));
 
 begin
@@ -140,10 +140,12 @@ begin
 
         -- read access (word-wise) --
         else
-          if (address mod 2 = 0) then
-            bus_rsp_o.data(31 downto 0) <= out_mat(address / 2)(31 downto 0);
-          else
-            bus_rsp_o.data(31 downto 0) <= out_mat(address / 2)(63 downto 32);
+          if (address < 2*12) then
+            if (address mod 2 = 0) then
+              bus_rsp_o.data(31 downto 0) <= out_mat(address / 2)(31 downto 0);
+            else
+              bus_rsp_o.data(31 downto 0) <= out_mat(address / 2)(63 downto 32);
+            end if;
           end if;
         end if;
 
@@ -163,7 +165,7 @@ begin
   -- cfs_reg_rd(1) <= x"0000000" & "000" & xor_reduce_f(cfs_reg_wr(1)); -- XOR all bits
   -- cfs_reg_rd(2) <= bit_rev_f(cfs_reg_wr(2)); -- bit reversal
   -- cfs_reg_rd(3) <= (others => '1');
-  gen_multiply_add: for i in 0 to 10 generate
+  gen_multiply_add: for i in 0 to 11 generate
     out_mat(i) <= std_ulogic_vector(
       unsigned(in_mat(0)(i)) * unsigned(ker_mat(0)(0)) +
       unsigned(in_mat(0)(i+1)) * unsigned(ker_mat(0)(1)) +

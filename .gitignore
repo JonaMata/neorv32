@@ -32,3 +32,7 @@ sw/image_gen/image_gen
 # generated documentation stuff
 /docs/doxygen_build/
 /docs/public/
+
+# IDE specific files
+.vscode/
+.idea/

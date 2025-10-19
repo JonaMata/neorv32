@@ -16,6 +16,10 @@ library neorv32;
 use neorv32.neorv32_package.all;
 
 entity neorv32_cfs is
+  generic (
+    MATRIX_SIZE  : integer := 13; -- size of input matrix
+    KERNEL_SIZE  : integer := 2   -- size of kernel matrix
+  );
   port (
     -- global control --
     clk_i     : in  std_ulogic; -- global clock line
@@ -34,13 +38,13 @@ end neorv32_cfs;
 architecture neorv32_cfs_rtl of neorv32_cfs is
 
   -- exemplary CFS interface registers --
-  type in_row is array (0 to 12) of std_ulogic_vector(31 downto 0);
-  type in_mat_type is array (0 to 1) of in_row;
+  type in_row is array (0 to (MATRIX_SIZE-1)) of std_ulogic_vector(31 downto 0);
+  type in_mat_type is array (0 to (KERNEL_SIZE-1)) of in_row;
   signal in_mat : in_mat_type := (others => (others => (others => '0')));
-  type ker_row is array (0 to 1) of std_ulogic_vector(31 downto 0);
-  type ker_mat_type is array (0 to 1) of ker_row;
+  type ker_row is array (0 to (KERNEL_SIZE-1)) of std_ulogic_vector(31 downto 0);
+  type ker_mat_type is array (0 to (KERNEL_SIZE-1)) of ker_row;
   signal ker_mat : ker_mat_type := (others => (others => (others => '0')));
-  type out_row is array (0 to 11) of std_ulogic_vector(63 downto 0);
+  type out_row is array (0 to (MATRIX_SIZE-KERNEL_SIZE+1)) of std_ulogic_vector(63 downto 0);
   signal out_mat : out_row := (others => (others => '0'));
 
 begin
@@ -131,16 +135,16 @@ begin
         address := to_integer(unsigned(bus_req_i.addr(15 downto 2)));
         -- write access (word-wise) --
         if (bus_req_i.rw = '1') then
-          if (address < 2*13) then
-            in_mat(address / 13)(address mod 13) <= bus_req_i.data;
-          elsif (address < 2*13 + 4) then
-            address := address - 2*13;
-            ker_mat(address / 2)(address mod 2) <= bus_req_i.data;
+          if (address < (MATRIX_SIZE*KERNEL_SIZE)) then
+            in_mat(address / MATRIX_SIZE)(address mod MATRIX_SIZE) <= bus_req_i.data;
+          elsif (address < (MATRIX_SIZE*KERNEL_SIZE) + (KERNEL_SIZE*KERNEL_SIZE)) then
+            address := address - (MATRIX_SIZE*KERNEL_SIZE);
+            ker_mat(address / KERNEL_SIZE)(address mod KERNEL_SIZE) <= bus_req_i.data;
           end if;
 
         -- read access (word-wise) --
         else
-          if (address < 2*12) then
+          if (address < 2*(MATRIX_SIZE-KERNEL_SIZE+1)) then
             if (address mod 2 = 0) then
               bus_rsp_o.data(31 downto 0) <= out_mat(address / 2)(31 downto 0);
             else
@@ -165,13 +169,31 @@ begin
   -- cfs_reg_rd(1) <= x"0000000" & "000" & xor_reduce_f(cfs_reg_wr(1)); -- XOR all bits
   -- cfs_reg_rd(2) <= bit_rev_f(cfs_reg_wr(2)); -- bit reversal
   -- cfs_reg_rd(3) <= (others => '1');
-  gen_multiply_add: for i in 0 to 11 generate
-    out_mat(i) <= std_ulogic_vector(
-      unsigned(in_mat(0)(i)) * unsigned(ker_mat(0)(0)) +
-      unsigned(in_mat(0)(i+1)) * unsigned(ker_mat(0)(1)) +
-      unsigned(in_mat(1)(i)) * unsigned(ker_mat(1)(0)) +
-      unsigned(in_mat(1)(i+1)) * unsigned(ker_mat(1)(1)));
-  end generate gen_multiply_add;
+
+  -- gen_multiply_add: for i in 0 to (MATRIX_SIZE-KERNEL_SIZE+1) generate
+  --   out_mat(i) <= std_ulogic_vector(
+  --     unsigned(in_mat(0)(i)) * unsigned(ker_mat(0)(0)) +
+  --     unsigned(in_mat(0)(i+1)) * unsigned(ker_mat(0)(1)) +
+  --     unsigned(in_mat(1)(i)) * unsigned(ker_mat(1)(0)) +
+  --     unsigned(in_mat(1)(i+1)) * unsigned(ker_mat(1)(1)));
+  -- end generate gen_multiply_add;
+
+  gen_multiply_add: for i in 0 to (MATRIX_SIZE - KERNEL_SIZE + 1) generate
+  process(all)
+    variable sum : unsigned(63 downto 0);
+  begin
+    sum := (others => '0');
+
+    for r in 0 to KERNEL_SIZE-1 loop
+      for c in 0 to KERNEL_SIZE-1 loop
+        sum := sum +
+          unsigned(in_mat(r)(i + c)) * unsigned(ker_mat(r)(c));
+      end loop;
+    end loop;
+
+    out_mat(i) <= std_ulogic_vector(sum);
+  end process;
+end generate gen_multiply_add;
 
 
 end neorv32_cfs_rtl;

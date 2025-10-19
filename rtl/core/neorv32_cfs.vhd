@@ -44,7 +44,7 @@ architecture neorv32_cfs_rtl of neorv32_cfs is
   type ker_row is array (0 to (KERNEL_SIZE-1)) of std_ulogic_vector(31 downto 0);
   type ker_mat_type is array (0 to (KERNEL_SIZE-1)) of ker_row;
   signal ker_mat : ker_mat_type := (others => (others => (others => '0')));
-  type out_row is array (0 to (MATRIX_SIZE-KERNEL_SIZE+1)) of std_ulogic_vector(63 downto 0);
+  type out_row is array (0 to (MATRIX_SIZE-KERNEL_SIZE)) of std_ulogic_vector(63 downto 0);
   signal out_mat : out_row := (others => (others => '0'));
 
 begin
@@ -178,7 +178,7 @@ begin
   --     unsigned(in_mat(1)(i+1)) * unsigned(ker_mat(1)(1)));
   -- end generate gen_multiply_add;
 
-  gen_multiply_add: for i in 0 to (MATRIX_SIZE - KERNEL_SIZE + 1) generate
+  gen_multiply_add: for i in 0 to (MATRIX_SIZE - KERNEL_SIZE) generate
   process(in_mat, ker_mat)
     variable sum : unsigned(63 downto 0);
   begin

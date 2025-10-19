@@ -35,7 +35,7 @@ architecture neorv32_cfs_rtl of neorv32_cfs is
 
   -- exemplary CFS interface registers --
   type in_row is array (0 to 12) of std_ulogic_vector(31 downto 0);
-  type in_mat_type is array (0 to 2) of in_row;
+  type in_mat_type is array (0 to 1) of in_row;
   signal in_mat : in_mat_type := (others => (others => (others => '0')));
   type ker_row is array (0 to 1) of std_ulogic_vector(31 downto 0);
   type ker_mat_type is array (0 to 1) of ker_row;
@@ -131,10 +131,10 @@ begin
         address := to_integer(unsigned(bus_req_i.addr(15 downto 2)));
         -- write access (word-wise) --
         if (bus_req_i.rw = '1') then
-          if (address < 3*13) then
+          if (address < 2*13) then
             in_mat(address / 13)(address mod 13) <= bus_req_i.data;
-          elsif (address < 3*13 + 4) then
-            address := address - 3*13;
+          elsif (address < 2*13 + 4) then
+            address := address - 2*13;
             ker_mat(address / 2)(address mod 2) <= bus_req_i.data;
           end if;
 

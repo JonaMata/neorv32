@@ -179,7 +179,7 @@ begin
   -- end generate gen_multiply_add;
 
   gen_multiply_add: for i in 0 to (MATRIX_SIZE - KERNEL_SIZE + 1) generate
-  process(all)
+  process(in_mat, ker_mat)
     variable sum : unsigned(63 downto 0);
   begin
     sum := (others => '0');

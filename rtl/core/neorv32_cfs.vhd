@@ -17,8 +17,8 @@ use neorv32.neorv32_package.all;
 
 entity neorv32_cfs is
   generic (
-    MATRIX_SIZE  : integer := 13; -- size of input matrix
-    KERNEL_SIZE  : integer := 2   -- size of kernel matrix
+    MATRIX_SIZE  : integer := 1300; -- size of input matrix
+    KERNEL_SIZE  : integer := 3     -- size of kernel matrix
   );
   port (
     -- global control --
@@ -119,6 +119,7 @@ begin
     if (rstn_i = '0') then
       in_mat <= (others => (others => (others => '0')));
       ker_mat <= (others => (others => (others => '0')));
+      out_mat <= (others => (others => (others => '0')));
       bus_rsp_o     <= rsp_terminate_c;
     elsif rising_edge(clk_i) then -- synchronous interface for read and write accesses
       -- transfer/access acknowledge --

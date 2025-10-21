@@ -24,6 +24,9 @@
 #define BAUD_RATE 19200
 /**@}*/
 
+#define MATRIX_SIZE 1300
+#define KERNEL_SIZE 3
+
 
 void run_dma() {
     // trigger DMA transfer
@@ -132,21 +135,19 @@ int main() {
   volatile uint32_t* kernelPtr = (volatile uint32_t*)kernel.p;
   volatile uint64_t* outputPtr = (volatile uint64_t*)output.p;
 
-  outputPtr[0] = 666;
-
-  neorv32_uart0_printf("Input data:\n");
-  for (int y = 0; y < 13; y++) {
-    for (int x = 0; x < 13; x++) {
-      int i = y*13 + x;
-      neorv32_uart0_printf("%u ", inputPtr[i]);
-    }
-    neorv32_uart0_printf("\n");
-  }
+  // neorv32_uart0_printf("Input data:\n");
+  // for (int y = 0; y < MATRIX_SIZE; y++) {
+  //   for (int x = 0; x < MATRIX_SIZE; x++) {
+  //     int i = y*MATRIX_SIZE + x;
+  //     neorv32_uart0_printf("%u ", inputPtr[i]);
+  //   }
+  //   neorv32_uart0_printf("\n");
+  // }
 
   neorv32_uart0_printf("Kernel data:\n");
-  for (int y = 0; y < 2; y++) {
-    for (int x = 0; x < 2; x++) {
-      int i = y*2 + x;
+  for (int y = 0; y < KERNEL_SIZE; y++) {
+    for (int x = 0; x < KERNEL_SIZE; x++) {
+      int i = y*KERNEL_SIZE + x;
       neorv32_uart0_printf("%u ", kernelPtr[i]);
     }
     neorv32_uart0_printf("\n");
@@ -172,45 +173,45 @@ int main() {
 
   {
     neorv32_dma_program(
-      (uint32_t)&inputPtr, // source array base address - byte-aligned
+      (uint32_t)&inputPtr[0], // source array base address - byte-aligned
       (uint32_t)&NEORV32_CFS->REG[0], // destination array base address - byte-aligned
       DMA_SRC_INC_WORD |       // read source data as incrementing bytes
       DMA_DST_INC_WORD |       // write destination data as incrementing bytes
-      13                     // number of elements to transfer: 16
+      MATRIX_SIZE                     // number of elements to transfer: 16
     );
 
     run_dma();
 
-    for (int y_out = 0; y_out < 12; y_out++) {
-      int offset = y_out % 2 + 1;
+    for (int y_out = 0; y_out < (MATRIX_SIZE-KERNEL_SIZE+1); y_out++) {
+      int offset = (y_out + 1) % KERNEL_SIZE;
 
       neorv32_dma_program(
-        (uint32_t)&inputPtr[(y_out+1)*13], // source array base address - byte-aligned
-        (uint32_t)&NEORV32_CFS->REG[offset*13], // destination array base address - byte-aligned
+        (uint32_t)&inputPtr[(y_out+1)*MATRIX_SIZE], // source array base address - byte-aligned
+        (uint32_t)&NEORV32_CFS->REG[offset*MATRIX_SIZE], // destination array base address - byte-aligned
         DMA_SRC_INC_WORD |       // read source data as incrementing bytes
         DMA_DST_INC_WORD |       // write destination data as incrementing bytes
-        13                       // number of elements to transfer: 16
+        MATRIX_SIZE               // number of elements to transfer: 16
       );
       
       run_dma();
-      for (int y = 0; y < 2; y++) {
+      for (int y = 0; y < KERNEL_SIZE; y++) {
 
         neorv32_dma_program(
-          (uint32_t)&kernelPtr[y*2], // source array base address - byte-aligned
-          (uint32_t)&NEORV32_CFS->REG[2*13 + (y+offset-1)%2*2], // destination array base address - byte-aligned
+          (uint32_t)&kernelPtr[y*KERNEL_SIZE], // source array base address - byte-aligned
+          (uint32_t)&NEORV32_CFS->REG[KERNEL_SIZE*MATRIX_SIZE + (y+offset+1)%KERNEL_SIZE*KERNEL_SIZE], // destination array base address - byte-aligned
           DMA_SRC_INC_WORD |       // read source data as incrementing bytes
           DMA_DST_INC_WORD |       // write destination data as incrementing bytes
-          2                       // number of elements to transfer: 16
+          KERNEL_SIZE               // number of elements to transfer: 16
         );
         run_dma();
       }
 
       neorv32_dma_program(
         (uint32_t)&NEORV32_CFS->REG[0], // source array base address - byte-aligned
-        (uint32_t)&outputPtr[y_out*12], // destination array base address - byte-aligned
+        (uint32_t)&outputPtr[y_out*(MATRIX_SIZE-KERNEL_SIZE+1)], // destination array base address - byte-aligned
         DMA_SRC_INC_WORD |       // read source data as incrementing bytes
         DMA_DST_INC_WORD |       // write destination data as incrementing bytes
-        2*12                       // number of elements to transfer: 16
+        2*(MATRIX_SIZE-KERNEL_SIZE+1)                      // number of elements to transfer: 16
       );
       run_dma();
 
@@ -221,14 +222,14 @@ int main() {
   neorv32_uart0_printf("Matrix done\n");
 
 
-  neorv32_uart0_printf("PL output data:\n");
-  for (int y = 0; y < 12; y++) {
-    for (int x = 0; x < 12; x++) {
-      int i = y*12 + x;
-      neorv32_uart0_printf("%u ", outputPtr[i]);
-    }
-    neorv32_uart0_printf("\n");
-  }
+  // neorv32_uart0_printf("PL output data:\n");
+  // for (int y = 0; y < (MATRIX_SIZE-KERNEL_SIZE+1); y++) {
+  //   for (int x = 0; x < (MATRIX_SIZE-KERNEL_SIZE+1); x++) {
+  //     int i = y*(MATRIX_SIZE-KERNEL_SIZE+1) + x;
+  //     neorv32_uart0_printf("%u ", outputPtr[i]);
+  //   }
+  //   neorv32_uart0_printf("\n");
+  // }
 
   // Signal jupyter notebook the program is finished, keep this in!
   neorv32_uart0_printf("\nExecution completed.\n");

@@ -119,7 +119,7 @@ begin
     if (rstn_i = '0') then
       in_mat <= (others => (others => (others => '0')));
       ker_mat <= (others => (others => (others => '0')));
-      out_mat <= (others => (others => (others => '0')));
+      out_mat <= (others => (others => '0'));
       bus_rsp_o     <= rsp_terminate_c;
     elsif rising_edge(clk_i) then -- synchronous interface for read and write accesses
       -- transfer/access acknowledge --

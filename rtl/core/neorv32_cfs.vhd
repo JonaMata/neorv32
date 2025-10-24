@@ -115,6 +115,8 @@ begin
 
   bus_access: process(rstn_i, clk_i)
   variable address : integer;
+  variable index : integer;
+  variable sum : unsigned(63 downto 0);
   begin
     if (rstn_i = '0') then
       in_mat <= (others => (others => (others => '0')));
@@ -138,10 +140,22 @@ begin
         if (bus_req_i.rw = '1') then
           if (address < (MATRIX_SIZE*KERNEL_SIZE)) then
             in_mat(address / MATRIX_SIZE)(address mod MATRIX_SIZE) <= bus_req_i.data;
+            index := (address mod MATRIX_SIZE)-2;
+            if (index >= 0) then
+              for r in 0 to KERNEL_SIZE-1 loop
+                for c in 0 to KERNEL_SIZE-1 loop
+                  sum := sum +
+                    unsigned(in_mat(r)(index + c)) * unsigned(ker_mat(r)(c));
+                end loop;
+              end loop;
+
+              out_mat(index) <= std_ulogic_vector(sum);
+            end if;
           elsif (address < (MATRIX_SIZE*KERNEL_SIZE) + (KERNEL_SIZE*KERNEL_SIZE)) then
             address := address - (MATRIX_SIZE*KERNEL_SIZE);
             ker_mat(address / KERNEL_SIZE)(address mod KERNEL_SIZE) <= bus_req_i.data;
           end if;
+
 
         -- read access (word-wise) --
         else
@@ -179,22 +193,22 @@ begin
   --     unsigned(in_mat(1)(i+1)) * unsigned(ker_mat(1)(1)));
   -- end generate gen_multiply_add;
 
-  gen_multiply_add: for i in 0 to (MATRIX_SIZE - KERNEL_SIZE) generate
-  process(in_mat, ker_mat)
-    variable sum : unsigned(63 downto 0);
-  begin
-    sum := (others => '0');
+--   gen_multiply_add: for i in 0 to (MATRIX_SIZE - KERNEL_SIZE) generate
+--   process(in_mat, ker_mat)
+--     variable sum : unsigned(63 downto 0);
+--   begin
+--     sum := (others => '0');
 
-    for r in 0 to KERNEL_SIZE-1 loop
-      for c in 0 to KERNEL_SIZE-1 loop
-        sum := sum +
-          unsigned(in_mat(r)(i + c)) * unsigned(ker_mat(r)(c));
-      end loop;
-    end loop;
+--     for r in 0 to KERNEL_SIZE-1 loop
+--       for c in 0 to KERNEL_SIZE-1 loop
+--         sum := sum +
+--           unsigned(in_mat(r)(i + c)) * unsigned(ker_mat(r)(c));
+--       end loop;
+--     end loop;
 
-    out_mat(i) <= std_ulogic_vector(sum);
-  end process;
-end generate gen_multiply_add;
+--     out_mat(i) <= std_ulogic_vector(sum);
+--   end process;
+-- end generate gen_multiply_add;
 
 
 end neorv32_cfs_rtl;

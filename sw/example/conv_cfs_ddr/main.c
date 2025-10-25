@@ -24,7 +24,7 @@
 #define BAUD_RATE 19200
 /**@}*/
 
-#define MATRIX_SIZE 1300
+#define MATRIX_SIZE 30
 #define KERNEL_SIZE 3
 
 

@@ -18,7 +18,8 @@ use neorv32.neorv32_package.all;
 entity neorv32_cfs is
   generic (
     MATRIX_SIZE  : integer := 1300; -- size of input matrix
-    KERNEL_SIZE  : integer := 3     -- size of kernel matrix
+    KERNEL_SIZE  : integer := 3;     -- size of kernel matrix
+    PARALLELISM : integer := 10     -- level of parallelism
   );
   port (
     -- global control --
@@ -44,8 +45,13 @@ architecture neorv32_cfs_rtl of neorv32_cfs is
   type ker_row is array (0 to (KERNEL_SIZE-1)) of std_ulogic_vector(31 downto 0);
   type ker_mat_type is array (0 to (KERNEL_SIZE-1)) of ker_row;
   signal ker_mat : ker_mat_type := (others => (others => (others => '0')));
-  type out_row is array (0 to (MATRIX_SIZE-KERNEL_SIZE)) of std_ulogic_vector(63 downto 0);
+  type out_row is array (0 to ((MATRIX_SIZE-KERNEL_SIZE)/PARALLELISM)) of std_ulogic_vector(63 downto 0);
   signal out_mat : out_row := (others => (others => '0'));
+  type parallel_in_row is array (0 to (PARALLELISM-1)) of std_ulogic_vector(31 downto 0);
+  type parallel_in_mat_type is array (0 to (KERNEL_SIZE-1)) of parallel_in_row;
+  signal parallel_in : parallel_in_mat_type := (others => (others => (others => '0')));
+  type parallel_out_row is array (0 to (PARALLELISM-1)) of std_ulogic_vector(63 downto 0);
+  signal parallel_out : parallel_out_row := (others => (others => '0'));
 
 begin
 
@@ -115,7 +121,8 @@ begin
 
   bus_access: process(rstn_i, clk_i)
   variable address : integer;
-  variable index : integer;
+  variable in_index : integer;
+  variable out_index : integer;
   variable sum : unsigned(63 downto 0);
   begin
     if (rstn_i = '0') then
@@ -140,17 +147,23 @@ begin
         if (bus_req_i.rw = '1') then
           if (address < (MATRIX_SIZE*KERNEL_SIZE)) then
             in_mat(address / MATRIX_SIZE)(address mod MATRIX_SIZE) <= bus_req_i.data;
-            index := (address mod MATRIX_SIZE)-2;
-            if (index >= 0) then
-              for r in 0 to KERNEL_SIZE-1 loop
-                for c in 0 to KERNEL_SIZE-1 loop
-                  sum := sum +
-                    unsigned(in_mat(r)(index + c)) * unsigned(ker_mat(r)(c));
-                end loop;
-              end loop;
+            in_index := (address mod MATRIX_SIZE);
+            out_index := in_index-2;
+            out_mat(out_index) <= parallel_out(out_index mod PARALLELISM);
+            for r in 0 to KERNEL_SIZE-1 loop
+              parallel_in(r)(in_index mod PARALLELISM) <= bus_req_i.data;
+            end loop;
 
-              out_mat(index) <= std_ulogic_vector(sum);
-            end if;
+            -- if (index >= 0) then
+            --   for r in 0 to KERNEL_SIZE-1 loop
+            --     for c in 0 to KERNEL_SIZE-1 loop
+            --       sum := sum +
+            --         unsigned(in_mat(r)(index + c)) * unsigned(ker_mat(r)(c));
+            --     end loop;
+            --   end loop;
+
+            --   out_mat(index) <= std_ulogic_vector(sum);
+            -- end if;
           elsif (address < (MATRIX_SIZE*KERNEL_SIZE) + (KERNEL_SIZE*KERNEL_SIZE)) then
             address := address - (MATRIX_SIZE*KERNEL_SIZE);
             ker_mat(address / KERNEL_SIZE)(address mod KERNEL_SIZE) <= bus_req_i.data;
@@ -160,10 +173,18 @@ begin
         -- read access (word-wise) --
         else
           if (address < 2*(MATRIX_SIZE-KERNEL_SIZE+1)) then
-            if (address mod 2 = 0) then
-              bus_rsp_o.data(31 downto 0) <= out_mat(address / 2)(31 downto 0);
+            if address < 2*((MATRIX_SIZE-KERNEL_SIZE+1)/PARALLELISM) then
+              if (address mod 2 = 0) then
+                bus_rsp_o.data(31 downto 0) <= out_mat(address / 2)(31 downto 0);
+              else
+                bus_rsp_o.data(31 downto 0) <= out_mat(address / 2)(63 downto 32);
+              end if;
             else
-              bus_rsp_o.data(31 downto 0) <= out_mat(address / 2)(63 downto 32);
+              if (address mod 2 = 0) then
+                bus_rsp_o.data(31 downto 0) <= parallel_out((address / 2) mod PARALLELISM)(31 downto 0);
+              else
+                bus_rsp_o.data(31 downto 0) <= parallel_out((address / 2) mod PARALLELISM)(63 downto 32);
+              end if;
             end if;
           end if;
         end if;
@@ -193,22 +214,22 @@ begin
   --     unsigned(in_mat(1)(i+1)) * unsigned(ker_mat(1)(1)));
   -- end generate gen_multiply_add;
 
---   gen_multiply_add: for i in 0 to (MATRIX_SIZE - KERNEL_SIZE) generate
---   process(in_mat, ker_mat)
---     variable sum : unsigned(63 downto 0);
---   begin
---     sum := (others => '0');
+  gen_multiply_add: for i in 0 to (PARALLELISM-1) generate
+  process(parallel_in, ker_mat)
+    variable sum : unsigned(63 downto 0);
+  begin
+    sum := (others => '0');
 
---     for r in 0 to KERNEL_SIZE-1 loop
---       for c in 0 to KERNEL_SIZE-1 loop
---         sum := sum +
---           unsigned(in_mat(r)(i + c)) * unsigned(ker_mat(r)(c));
---       end loop;
---     end loop;
+    for r in 0 to KERNEL_SIZE-1 loop
+      for c in 0 to KERNEL_SIZE-1 loop
+        sum := sum +
+          unsigned(parallel_in(r)((i + c) mod PARALLELISM)) * unsigned(ker_mat(r)(c));
+      end loop;
+    end loop;
 
---     out_mat(i) <= std_ulogic_vector(sum);
---   end process;
--- end generate gen_multiply_add;
+    parallel_out(i) <= std_ulogic_vector(sum);
+  end process;
+end generate gen_multiply_add;
 
 
 end neorv32_cfs_rtl;

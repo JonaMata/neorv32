@@ -151,7 +151,11 @@ begin
             out_index := in_index-2;
             out_mat(out_index) <= parallel_out(out_index mod PARALLELISM);
             for r in 0 to KERNEL_SIZE-1 loop
-              parallel_in(r)(in_index mod PARALLELISM) <= bus_req_i.data;
+              if r = address / MATRIX_SIZE then
+                parallel_in(r)(in_index mod PARALLELISM) <= bus_req_i.data;
+              else
+                parallel_in(r)(in_index mod PARALLELISM) <= in_mat(r)(in_index);
+              end if;
             end loop;
 
             -- if (index >= 0) then

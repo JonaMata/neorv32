@@ -185,15 +185,6 @@ int main() {
     for (int y_out = 0; y_out < (MATRIX_SIZE-KERNEL_SIZE+1); y_out++) {
       int offset = (y_out + KERNEL_SIZE - 1) % KERNEL_SIZE;
 
-      neorv32_dma_program(
-        (uint32_t)&inputPtr[(y_out+KERNEL_SIZE-1)*MATRIX_SIZE], // source array base address - byte-aligned
-        (uint32_t)&NEORV32_CFS->REG[offset*MATRIX_SIZE], // destination array base address - byte-aligned
-        DMA_SRC_INC_WORD |       // read source data as incrementing bytes
-        DMA_DST_INC_WORD |       // write destination data as incrementing bytes
-        MATRIX_SIZE               // number of elements to transfer: 16
-      );
-      
-      run_dma();
       for (int y = 0; y < KERNEL_SIZE; y++) {
 
         neorv32_dma_program(
@@ -205,6 +196,16 @@ int main() {
         );
         run_dma();
       }
+
+      neorv32_dma_program(
+        (uint32_t)&inputPtr[(y_out+KERNEL_SIZE-1)*MATRIX_SIZE], // source array base address - byte-aligned
+        (uint32_t)&NEORV32_CFS->REG[offset*MATRIX_SIZE], // destination array base address - byte-aligned
+        DMA_SRC_INC_WORD |       // read source data as incrementing bytes
+        DMA_DST_INC_WORD |       // write destination data as incrementing bytes
+        MATRIX_SIZE               // number of elements to transfer: 16
+      );
+      
+      run_dma();
 
       neorv32_dma_program(
         (uint32_t)&NEORV32_CFS->REG[0], // source array base address - byte-aligned

@@ -45,7 +45,7 @@ architecture neorv32_cfs_rtl of neorv32_cfs is
   type ker_row is array (0 to (KERNEL_SIZE-1)) of std_ulogic_vector(31 downto 0);
   type ker_mat_type is array (0 to (KERNEL_SIZE-1)) of ker_row;
   signal ker_mat : ker_mat_type := (others => (others => (others => '0')));
-  type out_row is array (0 to ((MATRIX_SIZE-KERNEL_SIZE)/PARALLELISM)) of std_ulogic_vector(63 downto 0);
+  type out_row is array (0 to (MATRIX_SIZE-KERNEL_SIZE+1)) of std_ulogic_vector(63 downto 0);
   signal out_mat : out_row := (others => (others => '0'));
   type parallel_in_row is array (0 to (PARALLELISM-1)) of std_ulogic_vector(31 downto 0);
   type parallel_in_mat_type is array (0 to (KERNEL_SIZE-1)) of parallel_in_row;
@@ -150,8 +150,8 @@ begin
             in_mat(address / MATRIX_SIZE)(address mod MATRIX_SIZE) <= bus_req_i.data;
             in_index := (address mod MATRIX_SIZE);
             out_index := in_index-2;
-            if out_index >= (PARALLELISM-KERNEL_SIZE+1) then
-              out_mat(out_index-(PARALLELISM-KERNEL_SIZE+1)) <= parallel_out((out_index-(PARALLELISM-KERNEL_SIZE+1)) mod PARALLELISM);
+            if out_index >= (PARALLELISM-KERNEL_SIZE) then
+              out_mat(out_index-(PARALLELISM-KERNEL_SIZE)) <= parallel_out((out_index-(PARALLELISM-KERNEL_SIZE)) mod PARALLELISM);
             end if;
             for r in 0 to KERNEL_SIZE-1 loop
               if r = address / MATRIX_SIZE then
@@ -180,7 +180,7 @@ begin
         -- read access (word-wise) --
         else
           if (address < 2*(MATRIX_SIZE-KERNEL_SIZE+1)) then
-            if address < 2*(((MATRIX_SIZE-KERNEL_SIZE+1)/PARALLELISM)*PARALLELISM) then
+            if address < 2*(MATRIX_SIZE-KERNEL_SIZE+1-7) then
               if (address mod 2 = 0) then
                 bus_rsp_o.data(31 downto 0) <= out_mat(address / 2)(31 downto 0);
               else

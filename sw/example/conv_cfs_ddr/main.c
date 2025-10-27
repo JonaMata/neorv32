@@ -33,12 +33,12 @@ void run_dma() {
   neorv32_dma_start();
 
   // wait for transfer to complete using polling
-  neorv32_uart0_printf("Waiting for DMA... \n");
+  // neorv32_uart0_printf("Waiting for DMA... \n");
   int dma_rc;
   while (1) {
     dma_rc = neorv32_dma_status();
     if (dma_rc == DMA_STATUS_DONE) {
-      neorv32_uart0_printf("Transfer done.\n");
+      // neorv32_uart0_printf("Transfer done.\n");
       break;
     }
     else if (dma_rc == DMA_STATUS_ERROR) {
@@ -177,16 +177,16 @@ int main() {
       (uint32_t)&NEORV32_CFS->REG[0], // destination array base address - byte-aligned
       DMA_SRC_INC_WORD |       // read source data as incrementing bytes
       DMA_DST_INC_WORD |       // write destination data as incrementing bytes
-      MATRIX_SIZE                     // number of elements to transfer: 16
+      MATRIX_SIZE*(KERNEL_SIZE-1)                     // number of elements to transfer: 16
     );
 
     run_dma();
 
     for (int y_out = 0; y_out < (MATRIX_SIZE-KERNEL_SIZE+1); y_out++) {
-      int offset = (y_out + 1) % KERNEL_SIZE;
+      int offset = (y_out + KERNEL_SIZE - 1) % KERNEL_SIZE;
 
       neorv32_dma_program(
-        (uint32_t)&inputPtr[(y_out+1)*MATRIX_SIZE], // source array base address - byte-aligned
+        (uint32_t)&inputPtr[(y_out+KERNEL_SIZE-1)*MATRIX_SIZE], // source array base address - byte-aligned
         (uint32_t)&NEORV32_CFS->REG[offset*MATRIX_SIZE], // destination array base address - byte-aligned
         DMA_SRC_INC_WORD |       // read source data as incrementing bytes
         DMA_DST_INC_WORD |       // write destination data as incrementing bytes
@@ -215,7 +215,10 @@ int main() {
       );
       run_dma();
 
-      neorv32_uart0_printf("Row done\n");
+      if (y_out % 100 == 0) {
+        neorv32_uart0_printf("Row done\n");
+      }
+      // neorv32_uart0_printf("Row done\n");
     }
   }
 

@@ -180,7 +180,7 @@ begin
         -- read access (word-wise) --
         else
           if (address < 2*(MATRIX_SIZE-KERNEL_SIZE+1)) then
-            if address < 2*((MATRIX_SIZE-KERNEL_SIZE+1)/PARALLELISM) then
+            if address < 2*(((MATRIX_SIZE-KERNEL_SIZE+1)/PARALLELISM)*PARALLELISM) then
               if (address mod 2 = 0) then
                 bus_rsp_o.data(31 downto 0) <= out_mat(address / 2)(31 downto 0);
               else
